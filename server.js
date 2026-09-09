@@ -9,7 +9,8 @@ const PORT = process.env.PORT || 3000;
 /* =========================
    1. MIDDLEWARE
 ========================= */
-app.use(express.static("public"));
+app.use(express.static(__dirname));
+
 app.use(express.json());
 
 app.use(
