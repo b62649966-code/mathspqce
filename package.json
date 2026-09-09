@@ -1,7 +1,7 @@
 {
-  "name": "scarlet-proxy-backend",
+  "name": "mathspqce-backend",
   "version": "1.0.0",
-  "description": "Backend routing engine",
+  "description": "Proxy service matching server requirements",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -9,6 +9,7 @@
   "dependencies": {
     "@titaniumnetwork-dev/ultraviolet": "^3.2.3",
     "express": "^4.19.2",
-    "axios": "^1.7.0"
+    "axios": "^1.7.0",
+    "cheerio": "^1.0.0"
   }
 }
