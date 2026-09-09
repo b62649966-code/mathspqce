@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scarlet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --mx: 50%;
+      --my: 50%;
+      --side: 64px;
+      --side-open: 200px;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: #05020c;
+      color: #e8dfff;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+    }
+
+    .bg { position: fixed; inset: 0; background: #070312; }
+    canvas#fx {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      display: block; z-index: 1;
+    }
+
+    .wash {
+      position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background: radial-gradient(
+        400px circle at var(--mx) var(--my),
+        rgba(205, 160, 255, 0.42) 0%,
+        rgba(130, 75, 210, 0.16) 30%,
+        transparent 60%
+      );
+      mix-blend-mode: screen;
+    }
+
+    .grain {
+      position: fixed; inset: 0; pointer-events: none; opacity: 0.07; z-index: 8;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    .vignette {
+      position: fixed; inset: 0; pointer-events: none; z-index: 7;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.75) 100%);
+    }
+
+    .scan {
+      position: fixed; inset: 0; pointer-events: none; z-index: 9;
+      background: repeating-linear-gradient(
+        to bottom, transparent 0, transparent 2px, rgba(0,0,0,0.12) 3px
+      );
+      opacity: 0.25;
+    }
+
+    .frame {
+      position: fixed; inset: 14px;
+      border: 1px solid rgba(170, 120, 255, 0.18);
+      pointer-events: none; z-index: 6;
+    }
+    .frame::before, .frame::after {
+      content: ""; position: absolute; width: 18px; height: 18px;
+      border-color: rgba(210, 170, 255, 0.7); border-style: solid;
+    }
+    .frame::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+    .frame::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+    .screen { position: fixed; inset: 0; z-index: 5; }
+    .screen.hidden { display: none; }
+
+    .landing {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 28px 36px;
+      height: 100%;
+      pointer-events: none;
+    }
+    .landing > * { pointer-events: auto; }
+
+    .top, .bottom {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(190, 160, 255, 0.55);
+    }
+    .bottom { font-size: 10px; color: rgba(160, 130, 210, 0.4); letter-spacing: 0.12em; }
+
+    .dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: #b47cff; box-shadow: 0 0 10px #b47cff;
+      margin-right: 8px; vertical-align: middle;
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+    .center {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 28px; text-align: center;
+    }
+
+    h1 {
+      font-family: Orbitron, sans-serif; font-weight: 700;
+      font-size: clamp(3.2rem, 11vw, 6rem);
+      letter-spacing: 0.22em; text-indent: 0.22em; line-height: 1;
+      color: #f3e9ff;
+      text-shadow: 0 0 30px rgba(160, 90, 255, 0.55), 0 0 80px rgba(100, 40, 180, 0.35);
+    }
+    h1 span {
+      display: block; font-family: "IBM Plex Mono", monospace;
+      font-size: 0.14em; letter-spacing: 0.55em; text-indent: 0.55em;
+      font-weight: 400; margin-top: 14px;
+      color: rgba(180, 150, 255, 0.5); text-shadow: none;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(190, 140, 255, 0.5);
+      background: rgba(60, 20, 110, 0.35);
+      color: #efe6ff;
+      font-family: Orbitron, sans-serif;
+      font-size: 12px; font-weight: 500;
+      letter-spacing: 0.28em; text-indent: 0.28em;
+      text-transform: uppercase;
+      padding: 14px 42px; cursor: pointer;
+      position: relative; overflow: hidden;
+      backdrop-filter: blur(6px);
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s;
+    }
+    .btn::before {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(105deg, transparent 40%, rgba(220,180,255,0.18) 50%, transparent 60%);
+      transform: translateX(-120%); transition: transform 0.45s ease;
+    }
+    .btn:hover {
+      border-color: rgba(230, 200, 255, 0.9);
+      background: rgba(110, 50, 190, 0.45);
+      box-shadow: 0 0 28px rgba(140, 70, 255, 0.35);
+      transform: translateY(-1px);
+    }
+    .btn:hover::before { transform: translateX(120%); }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn.full { width: 100%; text-indent: 0; letter-spacing: 0.2em; padding: 12px 20px; }
+    .btn.ghost {
+      background: transparent;
+      border-color: rgba(170, 120, 255, 0.25);
+      margin-top: 8px;
+    }
+
+    .modal-back {
+      position: fixed; inset: 0; z-index: 20;
+      background: rgba(3, 1, 10, 0.72);
+      backdrop-filter: blur(8px);
+      display: grid; place-items: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .modal-back.open { opacity: 1; pointer-events: auto; }
+
+    .modal {
+      width: min(380px, calc(100vw - 32px));
+      border: 1px solid rgba(180, 130, 255, 0.35);
+      background: rgba(18, 8, 36, 0.92);
+      box-shadow: 0 0 60px rgba(80, 30, 140, 0.45);
+      padding: 28px 26px 22px;
+      transform: translateY(10px) scale(0.98);
+      transition: transform 0.2s ease;
+      position: relative;
+    }
+    .modal-back.open .modal { transform: none; }
+
+    .modal h2 {
+      font-family: Orbitron, sans-serif;
+      font-size: 14px; letter-spacing: 0.3em;
+      text-transform: uppercase; margin-bottom: 6px;
+    }
+    .modal .sub {
+      font-size: 11px; color: rgba(180, 150, 255, 0.5);
+      margin-bottom: 22px; letter-spacing: 0.08em;
+    }
+
+    label {
+      display: block; font-size: 10px; letter-spacing: 0.16em;
+      text-transform: uppercase; color: rgba(190, 160, 255, 0.55);
+      margin-bottom: 6px;
+    }
+    .field { margin-bottom: 14px; }
+
+    input[type="email"], input[type="password"], input[type="text"] {
+      width: 100%;
+      background: rgba(8, 4, 18, 0.8);
+      border: 1px solid rgba(160, 120, 230, 0.3);
+      color: #f0e8ff;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 11px 12px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus {
+      border-color: rgba(200, 160, 255, 0.75);
+      box-shadow: 0 0 0 3px rgba(140, 80, 220, 0.2);
+    }
+
+    .err {
+      min-height: 18px;
+      font-size: 11px;
+      color: #ff8f9f;
+      margin: 4px 0 10px;
+      letter-spacing: 0.04em;
+    }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+    .tab {
+      flex: 1; appearance: none; cursor: pointer;
+      background: transparent;
+      border: 1px solid rgba(160, 120, 230, 0.25);
+      color: rgba(200, 170, 255, 0.55);
+      font-family: Orbitron, sans-serif;
+      font-size: 10px; letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 8px 0;
+      transition: 0.15s;
+    }
+    .tab.on {
+      color: #efe6ff;
+      border-color: rgba(200, 160, 255, 0.6);
+      background: rgba(100, 50, 180, 0.25);
+    }
+
+    .close-x {
+      position: absolute; top: 12px; right: 14px;
+      background: none; border: none; color: rgba(200,170,255,0.5);
+      font-size: 18px; cursor: pointer; line-height: 1;
+    }
+
+    .app {
+      display: flex;
+      height: 100%;
+      padding: 18px;
+      gap: 0;
+    }
+
+    .sidebar {
+      width: var(--side);
+      flex-shrink: 0;
+      height: 100%;
+      border: 1px solid rgba(170, 120, 255, 0.22);
+      background: rgba(12, 6, 28, 0.72);
+      backdrop-filter: blur(10px);
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 12px 0;
+      overflow: hidden;
+      transition: width 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+      z-index: 4;
+    }
+    .sidebar:hover,
+    .sidebar:focus-within {
+      width: var(--side-open);
+    }
+
+    .side-brand {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 18px 18px;
+      min-height: 48px;
+      border-bottom: 1px solid rgba(170, 120, 255, 0.12);
+      margin-bottom: 10px;
+    }
+    .side-brand .mark {
+      width: 28px; height: 28px; flex-shrink: 0;
+      border: 1px solid rgba(200, 160, 255, 0.5);
+      display: grid; place-items: center;
+      font-family: Orbitron, sans-serif;
+      font-size: 11px; color: #e8d6ff;
+      box-shadow: 0 0 16px rgba(140, 80, 255, 0.35);
+    }
+    .side-brand .name {
+      font-family: Orbitron, sans-serif;
+      font-size: 11px; letter-spacing: 0.22em;
+      white-space: nowrap; opacity: 0;
+      transition: opacity 0.18s ease 0.02s;
+    }
+    .sidebar:hover .side-brand .name,
+    .sidebar:focus-within .side-brand .name { opacity: 1; }
+
+    .nav {
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 0 10px;
+      flex: 1;
+    }
+
+    .nav-btn {
+      appearance: none; border: 1px solid transparent;
+      background: transparent; color: rgba(210, 185, 255, 0.7);
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 12px; cursor: pointer;
+      font-family: inherit; font-size: 12px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      text-align: left; width: 100%;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .nav-btn svg {
+      width: 22px; height: 22px; flex-shrink: 0;
+      stroke: currentColor; fill: none;
+      stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .nav-btn span {
+      opacity: 0;
+      transform: translateX(-6px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .sidebar:hover .nav-btn span,
+    .sidebar:focus-within .nav-btn span {
+      opacity: 1; transform: none;
+    }
+    .nav-btn:hover {
+      color: #f3e9ff;
+      background: rgba(120, 60, 200, 0.2);
+      border-color: rgba(180, 130, 255, 0.25);
+    }
+    .nav-btn.active {
+      color: #f3e9ff;
+      background: rgba(120, 60, 200, 0.28);
+      border-color: rgba(190, 140, 255, 0.4);
+      box-shadow: inset 2px 0 0 #c49cff;
+    }
+
+    .side-foot {
+      padding: 12px 10px 4px;
+      border-top: 1px solid rgba(170, 120, 255, 0.12);
+      margin-top: auto;
+    }
+
+    .main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 6px 6px 6px 16px;
+      height: 100%;
+    }
+
+    .topbar {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .search-wrap {
+      flex: 1;
+      display: flex; align-items: center; gap: 12px;
+      border: 1px solid rgba(170, 120, 255, 0.28);
+      background: rgba(12, 6, 28, 0.65);
+      backdrop-filter: blur(8px);
+      padding: 0 16px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search-wrap:focus-within {
+      border-color: rgba(210, 170, 255, 0.65);
+      box-shadow: 0 0 0 3px rgba(120, 70, 200, 0.18), 0 0 28px rgba(100, 50, 180, 0.2);
+    }
+    .search-wrap svg {
+      width: 18px; height: 18px; flex-shrink: 0;
+      stroke: rgba(190, 160, 255, 0.65); fill: none;
+      stroke-width: 1.7; stroke-linecap: round;
+    }
+    .search-wrap input {
+      flex: 1; border: none; background: transparent;
+      color: #f0e8ff; font-family: inherit; font-size: 13px;
+      padding: 14px 0; outline: none; letter-spacing: 0.04em;
+    }
+    .search-wrap input::placeholder { color: rgba(170, 145, 220, 0.4); }
+
+    .user-chip {
+      display: flex; align-items: center; gap: 10px;
+      border: 1px solid rgba(170, 120, 255, 0.25);
+      background: rgba(12, 6, 28, 0.65);
+      padding: 8px 12px 8px 10px;
+      max-width: 220px;
+    }
+    .user-chip .av {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, #7a3ad0, #3a1060);
+      border: 1px solid rgba(210, 170, 255, 0.4);
+      display: grid; place-items: center;
+      font-size: 11px; font-family: Orbitron, sans-serif;
+      flex-shrink: 0;
+    }
+    .user-chip .meta { min-width: 0; }
+    .user-chip .meta b {
+      display: block; font-weight: 500; font-size: 11px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .user-chip .meta small {
+      color: rgba(170, 145, 220, 0.5); font-size: 9px;
+      letter-spacing: 0.12em; text-transform: uppercase;
+    }
+
+    .panel {
+      flex: 1; min-height: 0;
+      border: 1px solid rgba(170, 120, 255, 0.18);
+      background: rgba(10, 5, 22, 0.45);
+      padding: 22px;
+      overflow: auto;
+    }
+    .panel.hidden { display: none; }
+
+    .panel-title {
+      font-family: Orbitron, sans-serif;
+      font-size: 12px; letter-spacing: 0.24em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      color: #efe6ff;
+    }
+    .panel-sub {
+      font-size: 11px; color: rgba(170, 145, 220, 0.5);
+      margin-bottom: 20px; letter-spacing: 0.06em;
+    }
+
+    .game-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .game-card {
+      border: 1px solid rgba(170, 120, 255, 0.22);
+      background: rgba(30, 12, 60, 0.35);
+      padding: 16px 12px;
+      cursor: pointer;
+      text-align: left;
+      color: inherit;
+      font-family: inherit;
+      transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+    .game-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(210, 170, 255, 0.55);
+      background: rgba(80, 35, 150, 0.35);
+      box-shadow: 0 8px 24px rgba(40, 10, 80, 0.35);
+    }
+    .game-card .ico {
+      width: 40px; height: 40px; margin-bottom: 12px;
+      border: 1px solid rgba(190, 150, 255, 0.35);
+      display: grid; place-items: center;
+      font-family: Orbitron, sans-serif; font-size: 13px;
+      color: #dcc8ff;
+      background: rgba(80, 40, 140, 0.35);
+    }
+    .game-card .title {
+      font-size: 12px; letter-spacing: 0.06em; margin-bottom: 4px;
+    }
+    .game-card .tag {
+      font-size: 10px; color: rgba(170, 145, 220, 0.45);
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+
+    .empty {
+      padding: 40px 10px;
+      text-align: center;
+      color: rgba(170, 145, 220, 0.45);
+      font-size: 12px; letter-spacing: 0.08em;
+    }
+
+    #proxyBar {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 42px;
+      background: rgba(8, 3, 18, 0.96);
+      border-bottom: 1px solid rgba(170, 120, 255, 0.28);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      z-index: 1000;
+      backdrop-filter: blur(10px);
+    }
+    #proxyBar.open { display: flex; }
+
+    #proxyBar button {
+      appearance: none;
+      background: rgba(60, 20, 110, 0.45);
+      border: 1px solid rgba(190, 140, 255, 0.4);
+      color: #efe6ff;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    #proxyBar button:hover {
+      background: rgba(110, 50, 190, 0.55);
+      border-color: rgba(230, 200, 255, 0.7);
+    }
+
+    #urlbar {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(160, 120, 230, 0.35);
+      background: rgba(12, 6, 28, 0.9);
+      color: #f0e8ff;
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+    #urlbar:focus {
+      border-color: rgba(200, 160, 255, 0.75);
+      box-shadow: 0 0 0 3px rgba(140, 80, 220, 0.2);
+    }
+
+    #frame {
+      position: fixed;
+      top: 42px; left: 0;
+      width: 100%;
+      height: calc(100% - 42px);
+      border: none;
+      display: none;
+      z-index: 999;
+      background: #05020c;
+    }
+    #frame.open { display: block; }
+
+    body.proxy-open .grain,
+    body.proxy-open .vignette,
+    body.proxy-open .scan,
+    body.proxy-open .frame,
+    body.proxy-open .wash {
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    @media (max-width: 640px) {
+      .user-chip .meta { display: none; }
+      .app { padding: 10px; }
+      .main { padding-left: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+  <canvas id="fx"></canvas>
+  <div class="wash"></div>
+  <div class="grain"></div>
+  <div class="vignette"></div>
+  <div class="scan"></div>
+  <div class="frame"></div>
+
+  <div id="proxyBar">
+    <button type="button" onclick="back()" title="Back">⬅</button>
+    <button type="button" onclick="forward()" title="Forward">➡</button>
+    <input id="urlbar" type="text" placeholder="Enter URL or search DuckDuckGo" autocomplete="off" />
+    <button type="button" onclick="go()">Go</button>
+    <button type="button" onclick="closeProxy()" title="Close proxy">✕</button>
+  </div>
+  <iframe id="frame" title="Proxy"></iframe>
+
+  <section class="screen landing" id="landing">
+    <div class="top">
+      <div><span class="dot"></span>link live</div>
+      <div id="clock">00:00:00</div>
+    </div>
+    <div class="center">
+      <h1>SCARLET<span>proxy node</span></h1>
+      <button class="btn" type="button" id="openAuth">Sign in</button>
+    </div>
+    <div class="bottom">
+      <div>sec tunnel // encrypted</div>
+      <div>77 Project · Scarlet UI · build 0.9.5</div>
+    </div>
+  </section>
+
+  <div class="modal-back" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal">
+      <button class="close-x" type="button" id="closeAuth" aria-label="Close">×</button>
+      <h2 id="authTitle">Sign in</h2>
+      <p class="sub" id="authSub">access proxy node</p>
+
+      <div class="tabs">
+        <button class="tab on" type="button" data-mode="in">Sign in</button>
+        <button class="tab" type="button" data-mode="up">Register</button>
+      </div>
+
+      <form id="authForm" autocomplete="on">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required placeholder="you@domain.com" />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required minlength="6" placeholder="••••••••" />
+        </div>
+        <div class="err" id="authErr"></div>
+        <button class="btn full" type="submit" id="authSubmit">Sign in</button>
+      </form>
+    </div>
+  </div>
+
+  <section class="screen app hidden" id="app">
+    <aside class="sidebar" id="sidebar" aria-label="Main">
+      <div class="side-brand">
+        <div class="mark">S</div>
+        <div class="name">SCARLET</div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-btn active" type="button" data-view="games" title="Games">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 12h4M8 10v4" />
+            <circle cx="16.5" cy="11" r="0.8" fill="currentColor" stroke="none" />
+            <circle cx="18.5" cy="13.5" r="0.8" fill="currentColor" stroke="none" />
+            <path d="M7.5 7h9a4.5 4.5 0 0 1 4.3 5.7l-1.1 3.2A2.2 2.2 0 0 1 17.6 17H6.4a2.2 2.2 0 0 1-2.1-1.1L3.2 12.7A4.5 4.5 0 0 1 7.5 7z" />
+          </svg>
+          <span>Games</span>
+        </button>
+
+        <button class="nav-btn" type="button" data-view="search" title="Search">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="M16.5 16.5L21 21" />
+          </svg>
+          <span>Search</span>
+        </button>
+
+        <button class="nav-btn" type="button" data-view="proxy" title="Proxy" id="proxyNavBtn">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 12h16" />
+            <path d="M12 4v16" />
+            <circle cx="12" cy="12" r="8" />
+          </svg>
+          <span>Proxy</span>
+        </button>
+      </nav>
+
+      <div class="side-foot">
+        <button class="nav-btn" type="button" id="signOutBtn" title="Sign out">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2" />
+            <path d="M4 12h11" />
+            <path d="M7 9l-3 3 3 3" />
+          </svg>
+          <span>Sign out</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="M16.5 16.5L21 21" />
+          </svg>
+          <input id="q" type="text" placeholder="Search DuckDuckGo or type a URL..." autocomplete="off" />
+        </div>
+        <div class="user-chip">
+          <div class="av" id="userAv">?</div>
+          <div class="meta">
+            <b id="userName">user</b>
+            <small>online</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="viewGames">
+        <div class="panel-title">Games</div>
+        <p class="panel-sub">pick a title · opens through reverse proxy</p>
+        <div class="game-grid" id="gameGrid"></div>
+      </div>
+
+      <div class="panel hidden" id="viewSearch">
+        <div class="panel-title">Search</div>
+        <p class="panel-sub" id="searchSub">type above to filter — Enter opens DuckDuckGo / URL via proxy</p>
+        <div class="game-grid" id="searchGrid"></div>
+      </div>
+
+      <div class="panel hidden" id="viewProxy">
+        <div class="panel-title">Proxy</div>
+        <p class="panel-sub">URL or search → DuckDuckGo · reverse proxy tunnel</p>
+        <div class="field" style="max-width: 520px;">
+          <label for="proxyInput">Destination</label>
+          <input id="proxyInput" type="text" placeholder="Search DuckDuckGo or type a URL" autocomplete="off" />
+        </div>
+        <button class="btn" type="button" id="proxyLaunch" style="margin-top: 8px;">Open proxy</button>
+        <button class="btn ghost" type="button" id="proxyNowgg" style="display:block; width:auto;">now.gg</button>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      signOut,
+    } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBNv2oi8O6H_zg4W6kbtKYRufAywYlY15Y",
+      authDomain: "wgs-1v1lol.firebaseapp.com",
+      databaseURL: "https://wgs-1v1lol-default-rtdb.firebaseio.com",
+      projectId: "wgs-1v1lol",
+      storageBucket: "wgs-1v1lol.firebasestorage.app",
+      messagingSenderId: "8776992981",
+      appId: "1:8776992981:web:5480fb6f5a47dfc3bbfa5c",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    const GAMES = [
+      { id: "nowgg", name: "now.gg", tag: "cloud", ico: "NG", url: "https://nowgg.lol/" },
+      { id: "1v1", name: "1v1.lol", tag: "shooter", ico: "1V", url: "https://1v1.lol/" },
+      { id: "slope", name: "Slope", tag: "arcade", ico: "SL", url: "https://slope.game/" },
+      { id: "ovr", name: "OvO", tag: "platform", ico: "OV", url: "https://ovo.game/" },
+      { id: "run3", name: "Run 3", tag: "runner", ico: "R3", url: "https://run3.io/" },
+      { id: "smash", name: "Smash Karts", tag: "racing", ico: "SK", url: "https://smashkarts.io/" },
+      { id: "shell", name: "Shell Shockers", tag: "fps", ico: "SS", url: "https://shellshock.io/" },
+      { id: "basket", name: "Basket Random", tag: "sports", ico: "BR", url: "https://basketrandom.com/" },
+      { id: "retro", name: "Retro Bowl", tag: "sports", ico: "RB", url: "https://retrobowl.me/" },
+      { id: "tunnel", name: "Tunnel Rush", tag: "arcade", ico: "TR", url: "https://tunnelrush.app/" },
+    ];
+
+    const landing = document.getElementById("landing");
+    const appScreen = document.getElementById("app");
+    const authModal = document.getElementById("authModal");
+    const authForm = document.getElementById("authForm");
+    const authErr = document.getElementById("authErr");
+    const authSubmit = document.getElementById("authSubmit");
+    const authTitle = document.getElementById("authTitle");
+    const authSub = document.getElementById("authSub");
+    const gameGrid = document.getElementById("gameGrid");
+    const searchGrid = document.getElementById("searchGrid");
+    const q = document.getElementById("q");
+    const viewGames = document.getElementById("viewGames");
+    const viewSearch = document.getElementById("viewSearch");
+    const viewProxy = document.getElementById("viewProxy");
+    const searchSub = document.getElementById("searchSub");
+
+    let mode = "in";
+
+    function card(g) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "game-card";
+      b.dataset.name = g.name.toLowerCase();
+      b.innerHTML = `
+        <div class="ico">${g.ico}</div>
+        <div class="title">${g.name}</div>
+        <div class="tag">${g.tag}</div>
+      `;
+      b.addEventListener("click", () => {
+        window.openSite(g.url || g.name);
+      });
+      return b;
+    }
+
+    function renderGames(list, into) {
+      into.innerHTML = "";
+      if (!list.length) {
+        into.innerHTML = `<div class="empty">no games matched</div>`;
+        return;
+      }
+      list.forEach((g) => into.appendChild(card(g)));
+    }
+
+    renderGames(GAMES, gameGrid);
+    renderGames(GAMES, searchGrid);
+
+    function filterGames(query) {
+      const s = query.trim().toLowerCase();
+      const list = !s
+        ? GAMES
+        : GAMES.filter(
+            (g) =>
+              g.name.toLowerCase().includes(s) ||
+              g.tag.toLowerCase().includes(s)
+          );
+      renderGames(list, gameGrid);
+      renderGames(list, searchGrid);
+      searchSub.textContent = s
+        ? `${list.length} result${list.length === 1 ? "" : "s"} for “${query.trim()}” · Enter = DuckDuckGo / URL`
+        : "type above to filter — Enter opens DuckDuckGo / URL via proxy";
+    }
+
+    q.addEventListener("input", () => filterGames(q.value));
+
+    q.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const val = q.value.trim();
+        if (val) window.openSite(val);
+      }
+    });
+
+    function setView(v) {
+      document.querySelectorAll(".nav-btn[data-view]").forEach((b) => {
+        b.classList.toggle("active", b.dataset.view === v);
+      });
+      viewGames.classList.toggle("hidden", v !== "games");
+      viewSearch.classList.toggle("hidden", v !== "search");
+      viewProxy.classList.toggle("hidden", v !== "proxy");
+      if (v === "search") q.focus();
+      if (v === "proxy") document.getElementById("proxyInput").focus();
+    }
+
+    document.querySelectorAll(".nav-btn[data-view]").forEach((btn) => {
+      btn.addEventListener("click", () => setView(btn.dataset.view));
+    });
+
+    document.getElementById("proxyLaunch").addEventListener("click", () => {
+      window.openSite(document.getElementById("proxyInput").value);
+    });
+    document.getElementById("proxyInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        window.openSite(document.getElementById("proxyInput").value);
+      }
+    });
+    document.getElementById("proxyNowgg").addEventListener("click", () => {
+      window.openSite("https://nowgg.lol/");
+    });
+
+    document.getElementById("openAuth").addEventListener("click", () => {
+      authModal.classList.add("open");
+      document.getElementById("email").focus();
+    });
+    document.getElementById("closeAuth").addEventListener("click", () => {
+      authModal.classList.remove("open");
+      authErr.textContent = "";
+    });
+    authModal.addEventListener("click", (e) => {
+      if (e.target === authModal) {
+        authModal.classList.remove("open");
+        authErr.textContent = "";
+      }
+    });
+
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        mode = tab.dataset.mode;
+        document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t === tab));
+        const signingIn = mode === "in";
+        authTitle.textContent = signingIn ? "Sign in" : "Register";
+        authSub.textContent = signingIn ? "access proxy node" : "create node credentials";
+        authSubmit.textContent = signingIn ? "Sign in" : "Create account";
+        authErr.textContent = "";
+      });
+    });
+
+    authForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      authErr.textContent = "";
+      authSubmit.disabled = true;
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      try {
+        if (mode === "in") {
+          await signInWithEmailAndPassword(auth, email, password);
+        } else {
+          await createUserWithEmailAndPassword(auth, email, password);
+        }
+        authModal.classList.remove("open");
+        authForm.reset();
+      } catch (err) {
+        authErr.textContent = niceError(err);
+      } finally {
+        authSubmit.disabled = false;
+      }
+    });
+
+    function niceError(err) {
+      const c = err?.code || "";
+      if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found"))
+        return "wrong email or password";
+      if (c.includes("email-already-in-use")) return "email already registered";
+      if (c.includes("weak-password")) return "password too weak (min 6)";
+      if (c.includes("invalid-email")) return "invalid email";
+      if (c.includes("too-many-requests")) return "too many tries — wait a bit";
+      return err.message || "auth failed";
+    }
+
+    document.getElementById("signOutBtn").addEventListener("click", () => {
+      window.closeProxy?.();
+      signOut(auth);
+    });
+
+    function showApp(user) {
+      landing.classList.add("hidden");
+      appScreen.classList.remove("hidden");
+      authModal.classList.remove("open");
+
+      const email = user.email || "user";
+      const name = email.split("@")[0];
+      document.getElementById("userName").textContent = name;
+      document.getElementById("userAv").textContent = name.slice(0, 1).toUpperCase();
+    }
+
+    function showLanding() {
+      appScreen.classList.add("hidden");
+      landing.classList.remove("hidden");
+      q.value = "";
+      filterGames("");
+      window.closeProxy?.();
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) showApp(user);
+      else showLanding();
+    });
+  </script>
+
+  <script>
+    /**
+     * PROXY_BASE:
+     * - "" = same origin (ngrok / direct Node) — default
+     * - If UI is on Bunny CDN and API is elsewhere, set full backend URL:
+     *   const PROXY_BASE = "https://your-node-server.com";
+     */
+    const PROXY_BASE = "";
+
+    function proxyUrl(pathAndQuery) {
+      return PROXY_BASE.replace(/\/$/, "") + pathAndQuery;
+    }
+
+    function openSite(input) {
+      if (!input) return;
+
+      let url = String(input).trim();
+      if (!url) return;
+
+      // DuckDuckGo when it's not a URL
+      if (!url.includes(".") && !url.startsWith("http")) {
+        url = "https://duckduckgo.com/?q=" + encodeURIComponent(url);
+      }
+
+      if (!url.startsWith("http")) {
+        url = "https://" + url;
+      }
+
+      const frame = document.getElementById("frame");
+      const bar = document.getElementById("proxyBar");
+      const urlbar = document.getElementById("urlbar");
+
+      frame.classList.add("open");
+      bar.classList.add("open");
+      document.body.classList.add("proxy-open");
+      frame.src = proxyUrl("/proxy?url=" + encodeURIComponent(url));
+
+      if (urlbar) urlbar.value = input;
+    }
+
+    function go() {
+      openSite(document.getElementById("urlbar").value);
+    }
+
+    function closeProxy() {
+      const frame = document.getElementById("frame");
+      const bar = document.getElementById("proxyBar");
+      frame.classList.remove("open");
+      bar.classList.remove("open");
+      document.body.classList.remove("proxy-open");
+      frame.src = "about:blank";
+    }
+
+    function back() {
+      fetch(proxyUrl("/nav/back"))
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.url) {
+            document.getElementById("frame").src =
+              proxyUrl("/proxy?url=" + encodeURIComponent(d.url));
+            const bar = document.getElementById("urlbar");
+            if (bar) bar.value = d.url;
+          }
+        })
+        .catch(() => {});
+    }
+
+    function forward() {
+      fetch(proxyUrl("/nav/forward"))
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.url) {
+            document.getElementById("frame").src =
+              proxyUrl("/proxy?url=" + encodeURIComponent(d.url));
+            const bar = document.getElementById("urlbar");
+            if (bar) bar.value = d.url;
+          }
+        })
+        .catch(() => {});
+    }
+
+    document.getElementById("urlbar").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        go();
+      }
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && document.body.classList.contains("proxy-open")) {
+        closeProxy();
+      }
+    });
+
+    window.openSite = openSite;
+    window.go = go;
+    window.back = back;
+    window.forward = forward;
+    window.closeProxy = closeProxy;
+  </script>
+
+  <script>
+    const root = document.documentElement;
+    let tx = innerWidth / 2, ty = innerHeight / 2;
+    let mx = tx, my = ty;
+
+    addEventListener("pointermove", (e) => {
+      tx = e.clientX; ty = e.clientY;
+    });
+
+    const canvas = document.getElementById("fx");
+    const ctx = canvas.getContext("2d");
+    let w = 0, h = 0, dpr = 1;
+    let stars = [], dust = [], nebulae = [], streaks = [];
+
+    const rand = (a, b) => a + Math.random() * (b - a);
+
+    function resize() {
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      w = innerWidth; h = innerHeight;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      stars = Array.from({ length: 160 }, () => {
+        const depth = Math.random();
+        return {
+          x: Math.random() * w, y: Math.random() * h,
+          r: depth * 1.6 + 0.25, depth: 0.15 + depth * 0.85,
+          tw: Math.random() * Math.PI * 2, tws: rand(0.008, 0.03),
+        };
+      });
+
+      dust = Array.from({ length: 55 }, () => ({
+        x: Math.random() * w, y: Math.random() * h,
+        r: rand(0.6, 2.2), vx: rand(-0.08, 0.08),
+        vy: rand(-0.12, -0.02), a: rand(0.08, 0.28),
+      }));
+
+      const m = Math.max(w, h);
+      nebulae = [
+        { x: w * 0.2, y: h * 0.75, r: m * 0.42, c: [90, 30, 160], a: 0.34, vx: 0.025, vy: -0.012, ph: 0 },
+        { x: w * 0.75, y: h * 0.25, r: m * 0.35, c: [55, 15, 120], a: 0.3, vx: -0.018, vy: 0.02, ph: 1.7 },
+        { x: w * 0.55, y: h * 0.6, r: m * 0.28, c: [140, 60, 210], a: 0.18, vx: 0.012, vy: 0.015, ph: 3.2 },
+        { x: w * 0.1, y: h * 0.2, r: m * 0.22, c: [40, 10, 90], a: 0.26, vx: 0.02, vy: 0.01, ph: 4.5 },
+        { x: w * 0.9, y: h * 0.85, r: m * 0.3, c: [100, 40, 180], a: 0.2, vx: -0.022, vy: -0.01, ph: 2.1 },
+      ];
+      streaks = [];
+    }
+
+    function spawnStreak() {
+      streaks.push({
+        x: rand(0, w * 1.1), y: rand(-40, h * 0.3),
+        len: rand(50, 130), speed: rand(4.5, 8.5),
+        ang: rand(0.35, 0.7), life: 1, decay: rand(0.012, 0.025),
+      });
+    }
+
+    resize();
+    addEventListener("resize", resize);
+    let lastStreak = 0;
+
+    function drawNebula(n, t) {
+      const pulse = 0.85 + Math.sin(t * 0.0004 + n.ph) * 0.15;
+      const r = n.r * pulse;
+      const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+      const [cr, cg, cb] = n.c;
+      g.addColorStop(0, `rgba(${cr + 40},${cg + 30},${cb + 40},${n.a})`);
+      g.addColorStop(0.4, `rgba(${cr},${cg},${cb},${n.a * 0.55})`);
+      g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function frame(t) {
+      mx += (tx - mx) * 0.12;
+      my += (ty - my) * 0.12;
+      root.style.setProperty("--mx", mx + "px");
+      root.style.setProperty("--my", my + "px");
+
+      ctx.fillStyle = "#070312";
+      ctx.fillRect(0, 0, w, h);
+
+      const shift = (Math.sin(t * 0.00015) + 1) * 0.5;
+      const band = ctx.createLinearGradient(0, 0, 0, h);
+      band.addColorStop(0, `rgba(20, 8, 45, ${0.35 + shift * 0.15})`);
+      band.addColorStop(0.45 + shift * 0.1, "rgba(40, 12, 80, 0.25)");
+      band.addColorStop(1, "rgba(12, 4, 28, 0.5)");
+      ctx.fillStyle = band;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.globalCompositeOperation = "lighter";
+      for (const n of nebulae) {
+        n.x += n.vx; n.y += n.vy;
+        if (n.x < -n.r * 0.3) n.x = w + n.r * 0.3;
+        if (n.x > w + n.r * 0.3) n.x = -n.r * 0.3;
+        if (n.y < -n.r * 0.3) n.y = h + n.r * 0.3;
+        if (n.y > h + n.r * 0.3) n.y = -n.r * 0.3;
+        drawNebula(n, t);
+      }
+
+      ctx.globalAlpha = 0.11;
+      for (let i = 0; i < 3; i++) {
+        const yy = h * (0.25 + i * 0.22) + Math.sin(t * 0.00035 + i * 2.1) * 40;
+        ctx.beginPath();
+        ctx.moveTo(0, yy);
+        for (let x = 0; x <= w; x += 24) {
+          const y = yy + Math.sin(x * 0.008 + t * 0.0008 + i) * (18 + i * 8)
+            + Math.sin(x * 0.02 - t * 0.0005 + i) * 10;
+          ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = i === 1 ? "rgb(180,120,255)" : "rgb(110,60,200)";
+        ctx.lineWidth = 40 + i * 20;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+
+      for (const s of stars) {
+        s.x += 0.015 * s.depth; s.y += 0.008 * s.depth;
+        if (s.x > w + 4) s.x = -4;
+        if (s.y > h + 4) s.y = -4;
+        s.tw += s.tws;
+        const a = 0.3 + (0.5 + Math.sin(s.tw) * 0.5) * 0.55 * s.depth;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(230, 215, 255, ${a})`;
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (const d of dust) {
+        d.x += d.vx; d.y += d.vy;
+        if (d.y < -5) { d.y = h + 5; d.x = Math.random() * w; }
+        if (d.x < -5) d.x = w + 5;
+        if (d.x > w + 5) d.x = -5;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(200, 170, 255, ${d.a})`;
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (t - lastStreak > 2800 + Math.random() * 4000) {
+        spawnStreak(); lastStreak = t;
+      }
+
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = streaks.length - 1; i >= 0; i--) {
+        const s = streaks[i];
+        s.x += Math.cos(s.ang) * s.speed;
+        s.y += Math.sin(s.ang) * s.speed;
+        s.life -= s.decay;
+        if (s.life <= 0 || s.x > w + 50 || s.y > h + 50) {
+          streaks.splice(i, 1); continue;
+        }
+        const ex = s.x - Math.cos(s.ang) * s.len;
+        const ey = s.y - Math.sin(s.ang) * s.len;
+        const g = ctx.createLinearGradient(ex, ey, s.x, s.y);
+        g.addColorStop(0, "rgba(180,140,255,0)");
+        g.addColorStop(0.7, `rgba(210,180,255,${0.35 * s.life})`);
+        g.addColorStop(1, `rgba(255,255,255,${0.7 * s.life})`);
+        ctx.strokeStyle = g; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(s.x, s.y); ctx.stroke();
+      }
+      ctx.globalCompositeOperation = "source-over";
+
+      const bot = ctx.createRadialGradient(w * 0.5, h * 1.05, 0, w * 0.5, h * 1.05, w * 0.7);
+      bot.addColorStop(0, `rgba(120, 50, 200, ${0.2 + Math.sin(t * 0.0006) * 0.06})`);
+      bot.addColorStop(1, "rgba(120, 50, 200, 0)");
+      ctx.fillStyle = bot;
+      ctx.fillRect(0, 0, w, h);
+
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    const clock = document.getElementById("clock");
+    setInterval(() => {
+      clock.textContent = new Date().toTimeString().slice(0, 8);
+    }, 250);
+  </script>
+</body>
+</html>
+
