@@ -1,16 +1,14 @@
 {
-  "name": "my-project",
+  "name": "scarlet-proxy-backend",
   "version": "1.0.0",
+  "description": "Backend routing engine",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "@google/genai": "^2.8.0",
-    "express": "^4.19.2"
-  },
-  "allowScripts": {
-    "@google/genai@2.8.0": true,
-    "protobufjs@7.6.4": true
+    "@titaniumnetwork-dev/ultraviolet": "^3.2.3",
+    "express": "^4.19.2",
+    "axios": "^1.7.0"
   }
 }
